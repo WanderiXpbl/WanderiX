@@ -1,0 +1,16 @@
+1 Kalsang_Corner Food 4.5 300 60 8 22
+2 Robers_Cave Nature 4.2 0 90 6 20
+3 FRI Culture 4.7 200 120 10 18
+4 Riverside_Cafe Food 4.0 250 60 9 21
+5 Pacific_Mall Shopping 3.8 500 120 10 21
+6 Sunset_Point_mussoorie Nature 4.8 0 60 5 19
+7 Mindrolling_Monastery Culture 4.1 150 90 9 17
+8 Rooftop_Bar Food 4.3 600 90 17 24
+9 Malsi_Deer_park Nature 4.4 100 90 7 18
+10 Street_Food_Lane Food 4.6 200 60 11 23
+11 Lakeside_Deck Nature 4.3 50 60 7 19
+12 History_Museum Culture 4.0 250 120 10 17
+13 Ellora_Bakery Food 4.4 150 30 7 20
+14 Skyline_Cafe Food 4.2 400 60 8 23
+15 Paltan_Bazaar Shopping 4.6 100 120 9 18
+
