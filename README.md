@@ -47,7 +47,7 @@ g++ -std=c++17 main.cpp -o wanderix
 - Hash map (`unordered_map`): find place by id, count per category
 - Hash set (`unordered_set`): check if a place is already in the plan
 - Linked list: itinerary
-- Stack: undo
+- Stack: undo task
 
 ## OOP
 Abstract class, inheritance (4 child classes), polymorphism (virtual `moodMatch()` and `getCategory()`),
