@@ -25,7 +25,7 @@ g++ -std=c++17 main.cpp -o wanderix
 | `data/roads.txt` | `from to minutes` (0 = Home) |
 
 ## Steps
-1. **Shortest times (Graph)**: at start-up Dijkstra runs from every node and fills a table
+1. **Shortest times (Graph)**: at start-up Dijkstra runs from every node and fill a table
    `dist[a][b]` = fastest travel time from a to b.
 2. **Filter**: remove places that cost more than the budget, don't match the mood, or are the start point.
 3. **Score** (0 to 1):
