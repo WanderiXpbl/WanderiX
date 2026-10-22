@@ -1,3 +1,4 @@
+<img width="2720" height="1280" alt="wanderix_system_architecture" src="https://github.com/user-attachments/assets/3c447f01-af81-478f-88e4-dd1ab0109cc0" />
 # WanderiX – Hangout Itinerary Planner (C++)
 
 Asks budget, time, mood and starting point, picks good places, and puts them
