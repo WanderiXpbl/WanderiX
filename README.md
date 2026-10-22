@@ -31,7 +31,7 @@ g++ -std=c++17 main.cpp -o wanderix
 3. **Score** (0 to 1):
    `0.5 × moodMatch + 0.35 × (rating − 3)/2 + 0.15 × (1 − cost/budget) − 0.1 × (same category already picked)`
 4. **Pick (max-heap)**: take the best score first. If its score dropped because its category was
-   already picked, push it back with the new score. Keep a place only if budget allows and
+   already picked, push it back with the new score. Keep a place only if budget allow and
    `findRoute()` can still fit all chosen places in the day.
 5. **Order (Route, greedy)**: from where you are, go to the place where you can *start the visit
    soonest* (travel + waiting for opening). Skip places that would be closed or go past the end time.
