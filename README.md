@@ -54,7 +54,7 @@ Abstract class, inheritance (4 child classes), polymorphism (virtual `moodMatch(
 encapsulation, composition (`Planner` has a `Graph` and an `Itinerary`), constructor/destructor.
 
 ## Limits / Phase 3 plan
-- Greedy ordering is fast (about k² steps) but **not always the shortest route**, and it can miss a valid
+- Greedy ordering is fast (about k² steps) but not always the shortest route, and it can miss a valid
   order that exists. Phase 3: replace the `findRoute()` function in `Route.h` with a method that checks all orders
   (or Held-Karp DP), and add a greedy vs optimal comparison over many random trips.
 - Trip ends at the last place (going back home is not counted).
