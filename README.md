@@ -40,7 +40,7 @@ g++ -std=c++17 main.cpp -o wanderix
 
 ## Data structures
 - Graph (adjacency list): roads
-- Min-heap: Dijkstra
+- Min-heap: Dijkstra algorithm
 - 2D table `dist`: shortest times between all places
 - Max-heap: picking best places
 - Hash map (`unordered_map`): find place by id, count per category
