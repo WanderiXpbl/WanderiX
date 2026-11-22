@@ -8,7 +8,7 @@ struct Stop {
     Place* place;
     int travel;   // minutes from previous stop
     int wait;     // minutes waited for the place to open
-    int start;    // time the visit starts
+    Time start;   // time the visit starts
     Stop* next;
 };
 
@@ -30,7 +30,7 @@ public:
         clear();
     }
 
-    void addStop(Place* p, int travel, int wait, int start) {
+    void addStop(Place* p, int travel, int wait, Time start) {
         Stop* s = new Stop;
         s->place = p;
         s->travel = travel;

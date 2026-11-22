@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>WanderiX</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">
+    <span class="logo" aria-hidden="true"></span>
+    <div>
+      <h1>WanderiX</h1>
+      <p>Plan a day out in Dehradun</p>
+    </div>
+  </div>
+</header>
+
+<main class="layout">
+
+  <!-- ============ the form ============ -->
+  <form class="card form" id="tripForm" novalidate>
+    <h2>Plan your day</h2>
+
+    <div class="row two">
+      <label>Budget (Rs.)
+        <input type="number" id="budget" min="0" max="100000" step="50" value="900" required>
+      </label>
+      <label>Day
+        <select id="day">
+          <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
+          <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option>
+          <option value="6">Sunday</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="row two">
+      <label>Start time <input type="time" id="start" value="10:30" required></label>
+      <label>End time <input type="time" id="end" value="17:45" required></label>
+    </div>
+
+    <label>Mood
+      <select id="mood">
+        <option value="1">Relaxed</option><option value="2">Foodie</option><option value="3">Adventurous</option>
+        <option value="4">Cultural</option><option value="5">Shopping</option>
+      </select>
+    </label>
+
+    <label>Starting point
+      <select id="startPlace"><option value="0">Home</option></select>
+    </label>
+
+    <label class="check"><input type="checkbox" id="returnHome"> Come back to the starting point at the end</label>
+
+    <label>Scoring style
+      <select id="style">
+        <option value="1">Balanced</option><option value="2">Budget saver</option><option value="3">Top rated</option>
+        <option value="4">Explorer (more variety)</option><option value="5">Custom (my own weights)</option>
+      </select>
+    </label>
+
+    <fieldset class="sliders" id="sliders" hidden>
+      <legend>What matters to you?</legend>
+      <label>Mood <input type="range" id="w_mood" min="0" max="100" value="35"><output id="o_mood">35</output></label>
+      <label>Rating <input type="range" id="w_rating" min="0" max="100" value="20"><output id="o_rating">20</output></label>
+      <label>Low cost <input type="range" id="w_cost" min="0" max="100" value="15"><output id="o_cost">15</output></label>
+      <label>Short visits <input type="range" id="w_time" min="0" max="100" value="10"><output id="o_time">10</output></label>
+      <label>Nearby <input type="range" id="w_near" min="0" max="100" value="20"><output id="o_near">20</output></label>
+      <label>Variety penalty <input type="range" id="w_repeat" min="0" max="30" value="10"><output id="o_repeat">10</output></label>
+      <p class="hint" id="sliderNote">The five weights are scaled to add up to 100%.</p>
+    </fieldset>
+
+    <label>Food stop at least every
+      <select id="mealGap">
+        <option value="120">2 hours</option><option value="150">2½ hours</option>
+        <option value="180" selected>3 hours</option><option value="210">3½ hours</option>
+        <option value="240">4 hours</option><option value="300">5 hours</option>
+      </select>
+    </label>
+    <p class="hint">Rules: two food places never come one after the other, and you get a food stop at least this often.</p>
+
+    <p class="error" id="formError" role="alert" hidden></p>
+    <button type="submit" class="primary" id="planBtn">Make my plan</button>
+  </form>
+
+  <!-- ============ the results ============ -->
+  <section class="results">
+    <nav class="tabs" role="tablist">
+      <button role="tab" data-tab="plan" class="active">Your plan</button>
+      <button role="tab" data-tab="map">Map</button>
+      <button role="tab" data-tab="explain">How it was planned</button>
+      <button role="tab" data-tab="places">All places</button>
+    </nav>
+
+    <p class="message" id="message" role="status" hidden></p>
+
+    <!-- your plan -->
+    <div class="tab card" id="tab-plan">
+      <div class="empty" id="planEmpty">
+        <h3>No plan yet</h3>
+        <p>Fill in the form and press <b>Make my plan</b>. WanderiX will pick places that fit your budget,
+           your time and their opening hours.</p>
+      </div>
+      <div id="planBody" hidden>
+        <div class="summary" id="summary"></div>
+        <details class="inside" open>
+          <summary>Inside the C++ for this plan</summary>
+          <div class="insideGrid" id="inside"></div>
+        </details>
+        <ol class="timeline" id="timeline"></ol>
+        <div class="toolbar">
+          <button id="undoBtn" type="button">Undo</button>
+          <button id="redoBtn" type="button">Redo</button>
+          <button id="downloadBtn" type="button">Download plan</button>
+        </div>
+        <div class="add">
+          <label for="search">Add a place</label>
+          <div class="searchbox">
+            <input type="search" id="search" placeholder="Type a name, e.g. ka or deer" autocomplete="off">
+            <ul class="suggestions" id="suggestions" hidden></ul>
+          </div>
+          <p class="hint">Search uses a trie: every word of a name can be typed from its start.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- map: the road graph -->
+    <div class="tab card" id="tab-map" hidden>
+      <h3>Road map (a graph)</h3>
+      <p class="hint">Each circle is a place (a node) and each line is a road with its travel time in minutes (an edge).
+         When the server started, Dijkstra ran once from every node. Your route is drawn in teal.</p>
+      <p class="mapStatus" id="mapStatus">Hover a dot to see its name. Click a place to see the fastest time from it to
+         every other place, then click a second place to see the fastest road between the two.</p>
+      <div class="mapWrap"><svg id="mapSvg" viewBox="0 0 1000 660" role="img" aria-label="Road map of all places"></svg></div>
+      <p class="mapRoute" id="mapRoute"></p>
+      <div class="legend">
+        <span><i class="key k-route"></i>Your route</span>
+        <span><i class="key k-path"></i>Fastest road you picked</span>
+        <span><i class="dotkey Food"></i>Food</span><span><i class="dotkey Nature"></i>Nature</span>
+        <span><i class="dotkey Culture"></i>Culture</span><span><i class="dotkey Shopping"></i>Shopping</span>
+        <span class="hint">Simplified drawing that keeps the real directions; the busy city centre is spread out so names are readable. Road times are estimates.</span>
+      </div>
+    </div>
+
+    <!-- how it was planned -->
+    <div class="tab card" id="tab-explain" hidden>
+      <div class="empty" id="explainEmpty"><h3>Nothing to explain yet</h3><p>Make a plan first.</p></div>
+      <div id="explainBody" hidden>
+        <h3>1. Filter</h3>
+        <p class="hint">Places that are too costly, closed that day, unreachable or wrong for the mood are removed.</p>
+        <ul class="filter" id="filterList"></ul>
+
+        <h3>2. Score cards</h3>
+        <p class="hint" id="formulaText"></p>
+        <div class="scroll"><table class="scores" id="scoreTable"></table></div>
+
+        <h3>3. Building the route, one stop at a time</h3>
+        <p class="hint">From where you are, every unused place that follows all the rules goes into a max-heap by score.
+           The top one becomes the next stop. Then the loop runs again from there.</p>
+        <div class="stepper">
+          <button type="button" id="prevStep">Previous</button>
+          <span id="stepCount"></span>
+          <button type="button" id="nextStep">Next</button>
+          <button type="button" id="playSteps">Play</button>
+        </div>
+        <div class="heapstep" id="heapStep"></div>
+      </div>
+    </div>
+
+    <!-- all places -->
+    <div class="tab card" id="tab-places" hidden>
+      <div class="placesHead">
+        <h3>All places</h3>
+        <label>Sort by
+          <select id="sortBy">
+            <option value="1">ID</option><option value="2">Rating</option><option value="3">Cost</option>
+            <option value="4">Visit time</option>
+          </select>
+        </label>
+      </div>
+      <div class="scroll"><table class="places" id="placesTable"></table></div>
+    </div>
+  </section>
+</main>
+
+<footer class="foot">WanderiX · Team DSCPP-III-2026-T057 · Graphic Era (Deemed to be University)</footer>
+
+<script src="app.js"></script>
+</body>
+</html>

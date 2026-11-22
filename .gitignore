@@ -1,0 +1,5 @@
+wanderix
+wanderix-server
+*.dSYM/
+.DS_Store
+docs/
