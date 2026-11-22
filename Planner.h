@@ -1,153 +1,111 @@
 #ifndef PLANNER_H
 #define PLANNER_H
 
-#include "Place.h"
-#include "Graph.h"
+#include "CityData.h"
 #include "Route.h"
+#include "Scorer.h"
 #include "Itinerary.h"
-#include <fstream>
-#include <sstream>
 #include <vector>
 #include <stack>
-#include <unordered_map>
 #include <unordered_set>
 using namespace std;
 
-const int MAX_STOPS = 7;   // max places picked automatically
+const int MAX_STOPS = 7;   // places picked automatically
+const int MAX_TOTAL = 8;   // places the user can have in total
 
-// saved change, used for undo
+// saved change, used for undo / redo
 struct Action {
     char type;   // 'A' = added, 'R' = removed
     Place* place;
 };
 
+// ---- the explanation of how a plan was made (shown on the website) ----
+
+struct FilterNote {        // step 1: kept or dropped, and why
+    Place* place;
+    bool kept;
+    string reason;
+};
+
+struct ScoreNote {         // step 2: the score card of each kept place
+    Place* place;
+    ScoreCard card;
+};
+
+// Makes a plan for one trip and lets the user edit it.
 class Planner {
 private:
-    vector<Place*> places;                 // all places
-    unordered_map<int, Place*> placeById;  // id -> place
-    Graph graph;
+    CityData* city;                        // places, roads (Dijkstra done), search: shared by every planner
+    RouteBuilder builder;                  // picks AND orders the places, one step at a time
+    Scorer scorer;                         // how places are scored
 
     // user answers
     int budget;
-    int startTime;
-    int endTime;
+    Time startTime;
+    Time endTime;
     int mood;
     int startPlace;                        // 0 = Home, otherwise a place id
+    int day;                               // 0 = Monday ... 6 = Sunday
+    bool returnHome;                       // must we travel back to the start?
+    int mealGap;                           // eat at least every mealGap minutes
 
     vector<Place*> plan;                   // chosen places
     unordered_set<int> inPlan;             // ids of chosen places (fast check)
     vector<Place*> route;                  // chosen places in visiting order
-    int routeTravel;
-    int routeEnd;
+    int routeTravel;                       // includes the trip back
+    int backTravel;                        // just the trip back
+    Time routeEnd;
+    bool edited;                           // changed by the user after planning
 
     Itinerary itinerary;
-    stack<Action> history;
+    stack<Action> undoStack;
+    stack<Action> redoStack;
+
+    // explanation of the last plan
+    vector<FilterNote> filterNotes;
+    vector<ScoreNote> scoreNotes;
+    vector<StepNote> stepNotes;
+
+    int returnNode() { return returnHome ? startPlace : -1; }
+
+    TripSettings settings() {
+        return {startPlace, returnNode(), startTime, endTime, mood, budget, mealGap};
+    }
 
 public:
-    Planner() {
+    Planner(CityData* city) : city(city), builder(&city->getGraph()), scorer(Scorer::preset(1)) {
         budget = 0;
-        startTime = 0;
-        endTime = 0;
         mood = RELAXED;
         startPlace = 0;
+        day = 0;
+        returnHome = false;
+        mealGap = 180;
         routeTravel = 0;
-        routeEnd = 0;
+        backTravel = 0;
+        edited = false;
     }
 
-    ~Planner() {
-        for (int i = 0; i < places.size(); i++)
-            delete places[i];
-    }
+    // ================= setting up =================
 
-    // ================= loading =================
-
-    bool loadData(string placesFile, string roadsFile) {
-        ifstream fin(placesFile);
-        if (!fin) {
-            cout << "Cannot open " << placesFile << endl;
-            return false;
-        }
-
-        int id, cost, duration, openHour, closeHour;
-        string name, category;
-        double rating;
-        int maxId = 0;
-
-        string line;
-        while (getline(fin, line)) {
-            if (line.empty()) continue;
-
-            // read one line at a time, so one bad line doesn't break the rest
-            stringstream ss(line);
-            if (!(ss >> id >> name >> category >> rating >> cost >> duration >> openHour >> closeHour)) {
-                cout << "Bad line in " << placesFile << ", skipped: " << line << endl;
-                continue;
-            }
-            replace(name.begin(), name.end(), '_', ' ');   // Cafe_Mocha -> Cafe Mocha
-            int open = openHour * 60, close = closeHour * 60;
-
-            Place* p;
-            if (category == "Food") p = new FoodPlace(id, name, rating, cost, duration, open, close);
-            else if (category == "Nature") p = new NaturePlace(id, name, rating, cost, duration, open, close);
-            else if (category == "Culture") p = new CulturePlace(id, name, rating, cost, duration, open, close);
-            else if (category == "Shopping") p = new ShoppingPlace(id, name, rating, cost, duration, open, close);
-            else {
-                cout << "Unknown category " << category << ", skipped" << endl;
-                continue;
-            }
-
-            places.push_back(p);
-            placeById[id] = p;
-            if (id > maxId) maxId = id;
-        }
-        fin.close();
-
-        ifstream rin(roadsFile);
-        if (!rin) {
-            cout << "Cannot open " << roadsFile << endl;
-            return false;
-        }
-        graph.setSize(maxId + 1);
-        int u, v, minutes;
-        while (rin >> u >> v >> minutes)
-            graph.addEdge(u, v, minutes);
-        rin.close();
-
-        graph.buildTable();
-        cout << "Loaded " << places.size() << " places." << endl;
-        return true;
-    }
-
-    void setTrip(int budget, int startTime, int endTime, int mood, int startPlace) {
+    void setTrip(int budget, Time startTime, Time endTime, int mood, int startPlace, int day, bool returnHome,
+                 int mealGap) {
         this->budget = budget;
         this->startTime = startTime;
         this->endTime = endTime;
         this->mood = mood;
         this->startPlace = startPlace;
+        this->day = day;
+        this->returnHome = returnHome;
+        this->mealGap = mealGap;
     }
 
-    bool hasPlace(int id) {
-        return placeById.count(id) > 0;
+    void setScorer(int style) { scorer = Scorer::preset(style); }
+
+    void setCustomScorer(double wMood, double wRating, double wCost, double wTime, double wNear, double wRepeat) {
+        scorer = Scorer("Custom", wMood, wRating, wCost, wTime, wNear, wRepeat, 0);
     }
 
-    // ================= choosing places =================
-
-    // score from 0 to 1, higher = better
-    //   50% how well it suits the mood
-    //   35% rating   (3 stars or less -> 0, 5 stars -> 1)
-    //   15% cost     (free -> 1, costs whole budget -> 0)
-    //   -0.1 for every place of the same category already picked (for variety)
-    double score(Place* p, int sameCategoryPicked) {
-        double moodPart = p->moodMatch(mood);
-
-        double ratingPart = (p->getRating() - 3) / 2;
-        if (ratingPart < 0) ratingPart = 0;
-
-        double costPart = 1;
-        if (budget > 0) costPart = 1 - (double)p->getCost() / budget;
-
-        return 0.5 * moodPart + 0.35 * ratingPart + 0.15 * costPart - 0.1 * sameCategoryPicked;
-    }
+    // ================= making a plan =================
 
     int totalCost() {
         int sum = 0;
@@ -156,19 +114,64 @@ public:
         return sum;
     }
 
-    bool isGoodPlace(Place* p) {
-        if (p->getCost() > budget) return false;
-        if (p->moodMatch(mood) < 0.4) return false;
-        if (p->getId() == startPlace) return false;                       // already there
-        if (graph.getTime(startPlace, p->getId()) == INF) return false;   // no road
-        return true;
+    // step 1: is this place worth considering? reason is empty if yes
+    string whyNot(Place* p) {
+        string moods[6] = {"", "Relaxed", "Foodie", "Adventurous", "Cultural", "Shopping"};
+        if (p->getId() == startPlace) return "you start here";
+        if (p->isClosedOn(day)) return "closed on " + DAY_NAMES[day];
+        if (p->getCost() > budget) return "costs Rs." + to_string(p->getCost()) + ", more than the budget";
+        if (p->moodMatch(mood) < 0.3) return "doesn't suit a " + moods[mood] + " mood";
+        if (city->getGraph().getTime(startPlace, p->getId()) == INF) return "no road to it";
+        return "";
     }
 
-    // asks the route planner to order 'plan'. Returns false if it doesn't fit.
+    // filter, then let the route builder pick and order the places
+    void makePlan() {
+        plan.clear();
+        inPlan.clear();
+        edited = false;
+        while (!undoStack.empty()) undoStack.pop();
+        while (!redoStack.empty()) redoStack.pop();
+        filterNotes.clear();
+        scoreNotes.clear();
+
+        // step 1: which places are worth considering at all
+        vector<Place*> candidates;
+        vector<Place*> all = city->getAllPlaces();
+        for (int i = 0; i < all.size(); i++) {
+            Place* p = all[i];
+            string reason = whyNot(p);
+            filterNotes.push_back({p, reason == "", reason});
+            if (reason != "") continue;
+            candidates.push_back(p);
+            scoreNotes.push_back({p, scorer.score(p, mood, budget, city->getGraph().getTime(startPlace, p->getId()), 0)});
+        }
+
+        // step 2: one loop picks the next best place again and again
+        vector<Place*> order;
+        int travel;
+        Time finish;
+        builder.build(candidates, false, MAX_STOPS, settings(), &scorer, order, travel, finish, &stepNotes);
+
+        // a chosen place shows the score it had at the moment it was chosen
+        for (int k = 0; k < stepNotes.size(); k++)
+            for (int i = 0; i < scoreNotes.size(); i++)
+                if (scoreNotes[i].place == stepNotes[k].chosen) scoreNotes[i].card = stepNotes[k].card;
+
+        for (int i = 0; i < order.size(); i++)
+            addToPlan(order[i]);
+        route = order;
+        routeTravel = travel;
+        routeEnd = finish;
+        buildItinerary();
+    }
+
+    // puts the places in 'plan' in order with the same step-by-step loop. Returns false if they don't all fit.
     bool updateRoute() {
         vector<Place*> order;
-        int travel, finish;
-        if (!findRoute(graph, plan, startPlace, startTime, endTime, order, travel, finish))
+        int travel;
+        Time finish;
+        if (!builder.build(plan, true, 1000, settings(), &scorer, order, travel, finish, NULL))
             return false;
 
         route = order;
@@ -178,53 +181,16 @@ public:
         return true;
     }
 
-    // best score first (max heap). Keep a place only if budget and time still work.
-    void makePlan() {
-        plan.clear();
-        inPlan.clear();
-        while (!history.empty()) history.pop();
-        updateRoute();   // empty plan
-
-        unordered_map<string, int> picked;        // category -> how many picked
-        priority_queue<pair<double, int>> heap;   // {score, id}
-        for (int i = 0; i < places.size(); i++)
-            if (isGoodPlace(places[i]))
-                heap.push({score(places[i], 0), places[i]->getId()});
-
-        while (!heap.empty() && plan.size() < MAX_STOPS) {
-            double oldScore = heap.top().first;
-            Place* p = placeById[heap.top().second];
-            heap.pop();
-
-            // score drops if we already picked this category -> put it back with new score
-            double newScore = score(p, picked[p->getCategory()]);
-            if (newScore < oldScore) {
-                heap.push({newScore, p->getId()});
-                continue;
-            }
-
-            if (totalCost() + p->getCost() > budget) continue;
-
-            plan.push_back(p);
-            if (updateRoute()) {
-                inPlan.insert(p->getId());
-                picked[p->getCategory()]++;
-            } else {
-                plan.pop_back();   // no time for this place
-            }
-        }
-    }
-
     // puts the route into the linked list with the timings
     void buildItinerary() {
         itinerary.clear();
-        int time = startTime;
+        Time time = startTime;
         int current = startPlace;
 
         for (int i = 0; i < route.size(); i++) {
             Place* p = route[i];
-            int travel = graph.getTime(current, p->getId());
-            time += travel;
+            int travel = city->getGraph().getTime(current, p->getId());
+            time = time + travel;
 
             int wait = 0;
             if (time < p->getOpenTime()) {
@@ -232,42 +198,129 @@ public:
                 time = p->getOpenTime();
             }
             itinerary.addStop(p, travel, wait, time);
-            time += p->getDuration();
+            time = time + p->getDuration();
             current = p->getId();
         }
+        backTravel = returnHome ? city->getGraph().getTime(current, startPlace) : 0;
     }
 
-    // ================= printing =================
+    // ================= editing (each returns a message) =================
 
-    void showPlan() {
-        printPlan(cout);
+    void removeFromPlan(Place* p) {
+        plan.erase(find(plan.begin(), plan.end(), p));
+        inPlan.erase(p->getId());
     }
 
-    void savePlan() {
-        if (itinerary.size() == 0) {
-            cout << "Nothing to save, the plan is empty." << endl;
-            return;
+    void addToPlan(Place* p) {
+        plan.push_back(p);
+        inPlan.insert(p->getId());
+    }
+
+    string addPlace(int id) {
+        if (!city->hasPlace(id)) return "No place with this ID.";
+        Place* p = city->getPlace(id);
+        if (plan.size() >= MAX_TOTAL) return "Max " + to_string(MAX_TOTAL) + " places allowed, remove one first.";
+        if (id == startPlace) return "You are starting at " + p->getName() + " already.";
+        if (inPlan.count(id)) return p->getName() + " is already in the plan.";
+        if (p->isClosedOn(day)) return p->getName() + " is closed on " + DAY_NAMES[day] + ".";
+        if (totalCost() + p->getCost() > budget)
+            return "Not enough budget! Only Rs." + to_string(budget - totalCost()) + " left.";
+
+        addToPlan(p);
+        if (!updateRoute()) {
+            removeFromPlan(p);
+            return "Can't fit " + p->getName() + ": no order fits your time, opening hours and the food rules.";
         }
-        string fileName;
-        cout << "File name (e.g. trip.txt): ";
-        cin >> fileName;
-
-        ofstream fout(fileName);
-        if (!fout) {
-            cout << "Could not create " << fileName << endl;
-            return;
-        }
-        printPlan(fout);
-        fout.close();
-        cout << "Plan saved to " << fileName << endl;
+        undoStack.push({'A', p});
+        while (!redoStack.empty()) redoStack.pop();   // a new change clears redo
+        edited = true;
+        return "Added " + p->getName() + ".";
     }
+
+    string removePlace(int id) {
+        if (!city->hasPlace(id) || inPlan.count(id) == 0) return "That place is not in the plan.";
+        Place* p = city->getPlace(id);
+        removeFromPlan(p);
+        if (!updateRoute()) {   // e.g. removing a meal leaves the other stops without food in time
+            addToPlan(p);
+            updateRoute();
+            return "Can't remove " + p->getName() + ": the other places would break a rule without it.";
+        }
+        undoStack.push({'R', p});
+        while (!redoStack.empty()) redoStack.pop();
+        edited = true;
+        return "Removed " + p->getName() + ".";
+    }
+
+    // the same set of places always gives the same route, so undo/redo restore plans exactly
+    string undo() {
+        if (undoStack.empty()) return "Nothing to undo.";
+        Action last = undoStack.top();
+        undoStack.pop();
+        if (last.type == 'A') removeFromPlan(last.place);
+        else addToPlan(last.place);
+        updateRoute();
+        redoStack.push(last);
+        return string("Undo: ") + (last.type == 'A' ? "removed " : "added back ") + last.place->getName() + ".";
+    }
+
+    string redo() {
+        if (redoStack.empty()) return "Nothing to redo.";
+        Action next = redoStack.top();
+        redoStack.pop();
+        if (next.type == 'A') addToPlan(next.place);
+        else removeFromPlan(next.place);
+        updateRoute();
+        undoStack.push(next);
+        return string("Redo: ") + (next.type == 'A' ? "added " : "removed ") + next.place->getName() + ".";
+    }
+
+    // ================= getters (used by main.cpp and server.cpp) =================
+
+    bool hasPlace(int id) { return city->hasPlace(id); }
+    Place* getPlace(int id) { return city->getPlace(id); }
+    vector<Place*> getAllPlaces() { return city->getAllPlaces(); }
+    vector<int> search(string prefix) { return city->search(prefix); }
+    Graph& getGraph() { return city->getGraph(); }
+    bool hasCoords(int id) { return city->hasCoords(id); }
+    pair<double, double> getCoords(int id) { return city->getCoords(id); }
+    string nameOf(int id) { return city->nameOf(id); }
+
+    Itinerary& getItinerary() { return itinerary; }
+    vector<Place*> getRoute() { return route; }
+    bool inPlanNow(int id) { return inPlan.count(id) > 0; }
+    int getTravel() { return routeTravel; }
+    int getBackTravel() { return backTravel; }
+    Time getFinish() { return routeEnd; }
+    Time getStartTime() { return startTime; }
+    Time getEndTime() { return endTime; }
+    int getBudget() { return budget; }
+    int getDay() { return day; }
+    bool getReturnHome() { return returnHome; }
+    int getStartPlace() { return startPlace; }
+    string getStartName() { return city->nameOf(startPlace); }
+    Scorer* getScorer() { return &scorer; }
+    int getMealGap() { return mealGap; }
+    bool isEdited() { return edited; }
+    bool canUndo() { return !undoStack.empty(); }
+    bool canRedo() { return !redoStack.empty(); }
+    int getUndoSize() { return undoStack.size(); }
+    int getRedoSize() { return redoStack.size(); }
+    vector<FilterNote>& getFilterNotes() { return filterNotes; }
+    vector<ScoreNote>& getScoreNotes() { return scoreNotes; }
+    vector<StepNote>& getStepNotes() { return stepNotes; }
+
+    // ================= printing and sorting =================
 
     // 'out' can be cout (screen) or an ofstream (file), both work the same way
     void printPlan(ostream& out) {
         string moods[6] = {"", "Relaxed", "Foodie", "Adventurous", "Cultural", "Shopping"};
         out << endl << "==================================================================" << endl;
-        out << " YOUR ITINERARY (" << timeToString(startTime) << " - " << timeToString(endTime)
-             << ")   Mood: " << moods[mood] << endl;
+        out << " YOUR ITINERARY (" << DAY_NAMES[day] << ", " << startTime << " - " << endTime
+            << ")   Mood: " << moods[mood] << endl;
+        out << " Scoring: " << scorer.getName() << "   Food: at least every " << mealGap / 60 << " h";
+        if (mealGap % 60) out << " " << mealGap % 60 << " min";
+        out << endl;
         out << "==================================================================" << endl;
 
         if (itinerary.size() == 0) {
@@ -275,26 +328,26 @@ public:
             return;
         }
 
-        out << setw(9) << timeToString(startTime) << "   Start - " << (startPlace == 0 ? "Home" : placeById[startPlace]->getName()) << endl;
+        out << setw(9) << startTime << "   Start - " << getStartName() << endl;
 
         int visitTime = 0, number = 1;
-        Stop* s = itinerary.getHead();
-
-        while (s != NULL) {
+        for (Stop* s = itinerary.getHead(); s != NULL; s = s->next) {
             Place* p = s->place;
-            out << setw(9) << timeToString(s->start) << "   " << number << ". " << p->getName()
-                 << " (" << p->getCategory() << ") " << fixed << setprecision(1) << p->getRating() << "/5"
-                 << " - Rs." << p->getCost() << " - " << s->travel << " min travel - "
-                 << p->getDuration() << " min visit";
+            out << setw(9) << s->start << "   " << number << ". " << p->getName()
+                << " (" << p->getCategory() << ") " << fixed << setprecision(1) << p->getRating() << "/5"
+                << " - Rs." << p->getCost() << " - " << s->travel << " min travel - "
+                << p->getDuration() << " min visit";
             if (s->wait > 0) out << " (waited " << s->wait << " min)";
             out << endl;
-
             visitTime += p->getDuration();
             number++;
-            s = s->next;
         }
 
-        out << setw(9) << timeToString(routeEnd) << "   Trip ends (" << endTime - routeEnd << " min free)" << endl;
+        if (returnHome)
+            out << setw(9) << routeEnd << "   Back at " << getStartName() << " (" << backTravel << " min travel)" << endl;
+        else
+            out << setw(9) << routeEnd << "   Trip ends" << endl;
+        out << "            " << endTime - routeEnd << " min free before " << endTime << endl;
         out << "------------------------------------------------------------------" << endl;
         out << " Total Cost   : Rs." << totalCost() << " / Rs." << budget << endl;
         out << " Total Travel : " << routeTravel << " min" << endl;
@@ -302,105 +355,24 @@ public:
         out << "==================================================================" << endl;
     }
 
-    void showAllPlaces() {
-        cout << endl << " ID  Name                Category  Rating  Cost      Time      Open hours" << endl;
-        for (int i = 0; i < places.size(); i++)
-            places[i]->print();
+    bool savePlan(string fileName) {
+        ofstream fout(fileName);
+        if (!fout) return false;
+        printPlan(fout);
+        return true;
     }
 
-    void showStartOptions() {
-        cout << "Which place are you starting from?" << endl;
-        for (int i = 0; i < places.size(); i++)
-            cout << setw(4) << places[i]->getId() << ". " << places[i]->getName() << endl;
-    }
+    static bool byRating(Place* a, Place* b) { return a->getRating() > b->getRating(); }
+    static bool byCost(Place* a, Place* b) { return a->getCost() < b->getCost(); }
+    static bool byDuration(Place* a, Place* b) { return a->getDuration() < b->getDuration(); }
 
-    // ================= editing =================
-
-    void removePlace() {
-        if (route.empty()) {
-            cout << "Plan is empty." << endl;
-            return;
-        }
-        for (int i = 0; i < route.size(); i++)
-            cout << "  " << i + 1 << ". " << route[i]->getName() << endl;
-
-        int n = readNumber("Which stop to remove? (0 = cancel): ", 0, route.size());
-        if (n == 0) return;
-
-        Place* p = route[n - 1];
-        plan.erase(find(plan.begin(), plan.end(), p));
-
-        if (!updateRoute()) {   // rare: greedy order of the rest doesn't fit
-            plan.push_back(p);
-            updateRoute();
-            cout << "Can't remove " << p->getName() << ", the other places don't fit without it." << endl;
-            return;
-        }
-        inPlan.erase(p->getId());
-        history.push({'R', p});
-
-        cout << "Removed " << p->getName() << endl;
-        showPlan();
-    }
-
-    void addPlace() {
-        showAllPlaces();
-        int id = readNumber("Enter place ID to add (0 = cancel): ", 0, 1000);
-        if (id == 0) return;
-
-        if (!hasPlace(id)) {
-            cout << "No place with this ID." << endl;
-            return;
-        }
-        Place* p = placeById[id];
-
-        if (id == startPlace) {
-            cout << "You are starting at " << p->getName() << " already." << endl;
-            return;
-        }
-        if (inPlan.count(id)) {
-            cout << p->getName() << " is already in the plan." << endl;
-            return;
-        }
-        if (totalCost() + p->getCost() > budget) {
-            cout << "Not enough budget! Only Rs." << budget - totalCost() << " left." << endl;
-            return;
-        }
-
-        plan.push_back(p);
-        if (!updateRoute()) {
-            plan.pop_back();
-            cout << "Can't fit " << p->getName() << " in your time (or it is closed then)." << endl;
-            return;
-        }
-        inPlan.insert(id);
-        history.push({'A', p});
-
-        cout << "Added " << p->getName() << endl;
-        showPlan();
-    }
-
-    // undo works because the same set of places always gives the same route
-    void undo() {
-        if (history.empty()) {
-            cout << "Nothing to undo." << endl;
-            return;
-        }
-        Action last = history.top();
-        history.pop();
-        Place* p = last.place;
-
-        if (last.type == 'A') {
-            plan.erase(find(plan.begin(), plan.end(), p));
-            inPlan.erase(p->getId());
-            cout << "Undo: removed " << p->getName() << endl;
-        } else {
-            plan.push_back(p);
-            inPlan.insert(p->getId());
-            cout << "Undo: added back " << p->getName() << endl;
-        }
-        updateRoute();
-        showPlan();
+    // 1 = by id, 2 = best rating first, 3 = cheapest first, 4 = shortest visit first
+    vector<Place*> sortedPlaces(int sortBy) {
+        vector<Place*> list = getAllPlaces();
+        if (sortBy == 2) sort(list.begin(), list.end(), byRating);
+        else if (sortBy == 3) sort(list.begin(), list.end(), byCost);
+        else if (sortBy == 4) sort(list.begin(), list.end(), byDuration);
+        return list;
     }
 };
 

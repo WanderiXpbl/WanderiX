@@ -12,11 +12,12 @@ protected:
     double rating;
     int cost;       // in Rs
     int duration;   // visit time in minutes
-    int openTime;   // in minutes from midnight
-    int closeTime;
+    Time openTime;
+    Time closeTime;
+    bool closedOn[7];   // closedOn[0] = closed on Monday
 
 public:
-    Place(int id, string name, double rating, int cost, int duration, int openTime, int closeTime) {
+    Place(int id, string name, double rating, int cost, int duration, Time openTime, Time closeTime) {
         this->id = id;
         this->name = name;
         this->rating = rating;
@@ -24,32 +25,51 @@ public:
         this->duration = duration;
         this->openTime = openTime;
         this->closeTime = closeTime;
+        for (int d = 0; d < 7; d++)
+            closedOn[d] = false;
     }
     virtual ~Place() {}
+
+    // text from the data file: "-" = open every day, "Mon" or "Mon,Tue" = closed those days
+    void setClosedDays(string text) {
+        for (int d = 0; d < 7; d++)
+            closedOn[d] = (text.find(DAY_SHORT[d]) != string::npos);
+    }
+
+    bool isClosedOn(int day) { return closedOn[day]; }
+
+    string closedDaysText() {
+        string s = "";
+        for (int d = 0; d < 7; d++)
+            if (closedOn[d]) s += (s == "" ? "" : ",") + DAY_SHORT[d];
+        return s == "" ? "-" : s;
+    }
 
     int getId() { return id; }
     string getName() { return name; }
     double getRating() { return rating; }
     int getCost() { return cost; }
     int getDuration() { return duration; }
-    int getOpenTime() { return openTime; }
-    int getCloseTime() { return closeTime; }
+    Time getOpenTime() { return openTime; }
+    Time getCloseTime() { return closeTime; }
 
     // every child class must write these two
     virtual string getCategory() = 0;
     virtual double moodMatch(int mood) = 0;   // 0 to 1, how much this place suits the mood
 
     void print() {
-        cout << setw(3) << id << "  " << left << setw(20) << name << setw(10) << getCategory() << right
+        cout << setw(3) << id << "  " << left << setw(24) << name << setw(10) << getCategory() << right
              << fixed << setprecision(1) << rating << "/5   Rs." << setw(4) << cost
              << "   " << setw(3) << duration << " min   "
-             << timeToString(openTime) << " - " << timeToString(closeTime) << endl;
+             << openTime << " - " << closeTime;
+        if (closedDaysText() != "-") cout << "  (closed " << closedDaysText() << ")";
+        cout << endl;
     }
 };
 
 class FoodPlace : public Place {
 public:
-    FoodPlace(int id, string name, double rating, int cost, int duration, int open, int close)
+    FoodPlace(int id, string name, double rating, int cost, int duration, Time open, Time close)
         : Place(id, name, rating, cost, duration, open, close) {}
 
     string getCategory() { return "Food"; }
@@ -63,7 +83,7 @@ public:
 
 class NaturePlace : public Place {
 public:
-    NaturePlace(int id, string name, double rating, int cost, int duration, int open, int close)
+    NaturePlace(int id, string name, double rating, int cost, int duration, Time open, Time close)
         : Place(id, name, rating, cost, duration, open, close) {}
 
     string getCategory() { return "Nature"; }
@@ -76,7 +96,7 @@ public:
 
 class CulturePlace : public Place {
 public:
-    CulturePlace(int id, string name, double rating, int cost, int duration, int open, int close)
+    CulturePlace(int id, string name, double rating, int cost, int duration, Time open, Time close)
         : Place(id, name, rating, cost, duration, open, close) {}
 
     string getCategory() { return "Culture"; }
@@ -91,7 +111,7 @@ public:
 
 class ShoppingPlace : public Place {
 public:
-    ShoppingPlace(int id, string name, double rating, int cost, int duration, int open, int close)
+    ShoppingPlace(int id, string name, double rating, int cost, int duration, Time open, Time close)
         : Place(id, name, rating, cost, duration, open, close) {}
 
     string getCategory() { return "Shopping"; }
