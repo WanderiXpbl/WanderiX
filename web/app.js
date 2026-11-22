@@ -85,7 +85,7 @@ function readForm() {
     day: $("day").value,
     start: start,
     end: end,
-    mood: $("mood").value,
+    mood: document.querySelector("input[name=mood]:checked").value,
     style: $("style").value,
     startPlace: $("startPlace").value,
     returnHome: $("returnHome").checked ? 1 : 0,
@@ -115,11 +115,20 @@ async function makePlan(event) {
   try {
     render(await api("/api/plan", form.params));
     showTab("plan");
+    if (document.body.classList.contains("landing")) {
+      document.body.classList.remove("landing");   // first plan: form moves left, results appear right
+      window.scrollTo(0, 0);
+    }
   } catch (e) {
-    showMessage(e.message, true);
+    if (document.body.classList.contains("landing")) {
+      $("formError").textContent = e.message;
+      $("formError").hidden = false;
+    } else {
+      showMessage(e.message, true);
+    }
   } finally {
     $("planBtn").disabled = false;
-    $("planBtn").textContent = "Make my plan";
+    $("planBtn").textContent = document.body.classList.contains("landing") ? "Make my plan" : "Update my plan";
   }
 }
 

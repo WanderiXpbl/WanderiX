@@ -4,13 +4,17 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>WanderiX</title>
+<link rel="icon" type="image/png" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="landing">
 
 <header class="top">
   <div class="brand">
-    <span class="logo" aria-hidden="true"></span>
+    <img class="logo" src="logo.png" alt="" width="44" height="44">
     <div>
       <h1>WanderiX</h1>
       <p>Plan a day out in Dehradun</p>
@@ -21,70 +25,90 @@
 <main class="layout">
 
   <!-- ============ the form ============ -->
+  <div class="formSide">
+    <div class="hero">
+      <h2>Your day in Dehradun, planned in a click</h2>
+      <p>Tell us your budget, your time and your mood. WanderiX picks places that are open, fit your
+         budget and are close to each other, and puts them in the best order.</p>
+      <ul class="facts">
+        <li><b>47</b> places</li><li><b>105</b> roads</li><li>Dehradun &amp; Mussoorie</li>
+      </ul>
+    </div>
+
   <form class="card form" id="tripForm" novalidate>
-    <h2>Plan your day</h2>
+    <h2 class="formTitle">Plan your day</h2>
 
-    <div class="row two">
-      <label>Budget (Rs.)
-        <input type="number" id="budget" min="0" max="100000" step="50" value="900" required>
+    <section class="group">
+      <h3><span class="step">1</span> When and how much</h3>
+      <div class="row two">
+        <label>Budget (Rs.)
+          <input type="number" id="budget" min="0" max="100000" step="50" value="900" required>
+        </label>
+        <label>Day
+          <select id="day">
+            <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
+            <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option>
+            <option value="6">Sunday</option>
+          </select>
+        </label>
+      </div>
+      <div class="row two">
+        <label>Start time <input type="time" id="start" value="10:30" required></label>
+        <label>End time <input type="time" id="end" value="17:45" required></label>
+      </div>
+    </section>
+
+    <section class="group">
+      <h3><span class="step">2</span> Your mood</h3>
+      <div class="moods" role="radiogroup" aria-label="Mood">
+        <label class="mood"><input type="radio" name="mood" value="1" checked><span><i aria-hidden="true">🌿</i>Relaxed</span></label>
+        <label class="mood"><input type="radio" name="mood" value="2"><span><i aria-hidden="true">🍜</i>Foodie</span></label>
+        <label class="mood"><input type="radio" name="mood" value="3"><span><i aria-hidden="true">🧗</i>Adventurous</span></label>
+        <label class="mood"><input type="radio" name="mood" value="4"><span><i aria-hidden="true">🏛️</i>Cultural</span></label>
+        <label class="mood"><input type="radio" name="mood" value="5"><span><i aria-hidden="true">🛍️</i>Shopping</span></label>
+      </div>
+    </section>
+
+    <section class="group">
+      <h3><span class="step">3</span> Where and the rules</h3>
+      <label>Starting point
+        <select id="startPlace"><option value="0">Home</option></select>
       </label>
-      <label>Day
-        <select id="day">
-          <option value="0">Monday</option><option value="1">Tuesday</option><option value="2">Wednesday</option>
-          <option value="3">Thursday</option><option value="4">Friday</option><option value="5">Saturday</option>
-          <option value="6">Sunday</option>
-        </select>
-      </label>
-    </div>
+      <label class="check"><input type="checkbox" id="returnHome"> Come back to the starting point at the end</label>
 
-    <div class="row two">
-      <label>Start time <input type="time" id="start" value="10:30" required></label>
-      <label>End time <input type="time" id="end" value="17:45" required></label>
-    </div>
+      <div class="row two">
+        <label>Scoring style
+          <select id="style">
+            <option value="1">Balanced</option><option value="2">Budget saver</option><option value="3">Top rated</option>
+            <option value="4">Explorer (more variety)</option><option value="5">Custom (my own weights)</option>
+          </select>
+        </label>
+        <label>Food stop at least every
+          <select id="mealGap">
+            <option value="120">2 hours</option><option value="150">2½ hours</option>
+            <option value="180" selected>3 hours</option><option value="210">3½ hours</option>
+            <option value="240">4 hours</option><option value="300">5 hours</option>
+          </select>
+        </label>
+      </div>
 
-    <label>Mood
-      <select id="mood">
-        <option value="1">Relaxed</option><option value="2">Foodie</option><option value="3">Adventurous</option>
-        <option value="4">Cultural</option><option value="5">Shopping</option>
-      </select>
-    </label>
-
-    <label>Starting point
-      <select id="startPlace"><option value="0">Home</option></select>
-    </label>
-
-    <label class="check"><input type="checkbox" id="returnHome"> Come back to the starting point at the end</label>
-
-    <label>Scoring style
-      <select id="style">
-        <option value="1">Balanced</option><option value="2">Budget saver</option><option value="3">Top rated</option>
-        <option value="4">Explorer (more variety)</option><option value="5">Custom (my own weights)</option>
-      </select>
-    </label>
-
-    <fieldset class="sliders" id="sliders" hidden>
-      <legend>What matters to you?</legend>
-      <label>Mood <input type="range" id="w_mood" min="0" max="100" value="35"><output id="o_mood">35</output></label>
-      <label>Rating <input type="range" id="w_rating" min="0" max="100" value="20"><output id="o_rating">20</output></label>
-      <label>Low cost <input type="range" id="w_cost" min="0" max="100" value="15"><output id="o_cost">15</output></label>
-      <label>Short visits <input type="range" id="w_time" min="0" max="100" value="10"><output id="o_time">10</output></label>
-      <label>Nearby <input type="range" id="w_near" min="0" max="100" value="20"><output id="o_near">20</output></label>
-      <label>Variety penalty <input type="range" id="w_repeat" min="0" max="30" value="10"><output id="o_repeat">10</output></label>
-      <p class="hint" id="sliderNote">The five weights are scaled to add up to 100%.</p>
-    </fieldset>
-
-    <label>Food stop at least every
-      <select id="mealGap">
-        <option value="120">2 hours</option><option value="150">2½ hours</option>
-        <option value="180" selected>3 hours</option><option value="210">3½ hours</option>
-        <option value="240">4 hours</option><option value="300">5 hours</option>
-      </select>
-    </label>
-    <p class="hint">Rules: two food places never come one after the other, and you get a food stop at least this often.</p>
+      <fieldset class="sliders" id="sliders" hidden>
+        <legend>What matters to you?</legend>
+        <label>Mood <input type="range" id="w_mood" min="0" max="100" value="35"><output id="o_mood">35</output></label>
+        <label>Rating <input type="range" id="w_rating" min="0" max="100" value="20"><output id="o_rating">20</output></label>
+        <label>Low cost <input type="range" id="w_cost" min="0" max="100" value="15"><output id="o_cost">15</output></label>
+        <label>Short visits <input type="range" id="w_time" min="0" max="100" value="10"><output id="o_time">10</output></label>
+        <label>Nearby <input type="range" id="w_near" min="0" max="100" value="20"><output id="o_near">20</output></label>
+        <label>Variety penalty <input type="range" id="w_repeat" min="0" max="30" value="10"><output id="o_repeat">10</output></label>
+        <p class="hint" id="sliderNote">The five weights are scaled to add up to 100%.</p>
+      </fieldset>
+      <p class="hint">Two food places never come one after the other, and you get a food stop at least this often.</p>
+    </section>
 
     <p class="error" id="formError" role="alert" hidden></p>
     <button type="submit" class="primary" id="planBtn">Make my plan</button>
   </form>
+  </div>
 
   <!-- ============ the results ============ -->
   <section class="results">
@@ -106,10 +130,6 @@
       </div>
       <div id="planBody" hidden>
         <div class="summary" id="summary"></div>
-        <details class="inside" open>
-          <summary>Inside the C++ for this plan</summary>
-          <div class="insideGrid" id="inside"></div>
-        </details>
         <ol class="timeline" id="timeline"></ol>
         <div class="toolbar">
           <button id="undoBtn" type="button">Undo</button>
@@ -124,6 +144,10 @@
           </div>
           <p class="hint">Search uses a trie: every word of a name can be typed from its start.</p>
         </div>
+        <details class="inside" open>
+          <summary>Inside the C++ for this plan</summary>
+          <div class="insideGrid" id="inside"></div>
+        </details>
       </div>
     </div>
 
