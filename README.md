@@ -3,7 +3,7 @@
 Plans a day out in Dehradun: asks your budget, start and end time (with minutes), mood, scoring
 style, starting point and how often you want food, then builds the trip one stop at a time so every
 visit fits opening hours and your end time, two food places never come one after the other, and you
-always get a food stop in time.
+always get food stop in time.
 
 ## Run
 **Website** (same planner, in the browser):
